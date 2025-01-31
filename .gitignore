@@ -148,8 +148,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
-.dmypy.json
-dmypy.json
 
 # Pyre type checker
 .pyre/
@@ -169,3 +167,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Ignore script outputs
+*.csv
+*.json
