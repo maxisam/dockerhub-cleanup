@@ -12,7 +12,7 @@ The **DockerHub Cleanup Script** is a Python-based tool designed to manage and o
 ### 2. Smart Cleanup:
 - Maintains latest, prod, production tags
 - Keeps 10 most recent tags regardless of name
-- Skips logspout* (defined) repositories
+- Skips specific repositories, ex: logspout*
 
 ### 3. Enterprise-Ready:
 - Handles Docker Hub pagination
