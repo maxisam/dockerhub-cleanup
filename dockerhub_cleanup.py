@@ -28,6 +28,8 @@ def parse_args():
     parser.add_argument("--backup-file", default="dockerhub_backup.json", help="Backup file path")
     parser.add_argument("--retention-days", type=int, default=90, help="Days to retain tags")
     parser.add_argument("--preserve-last", type=int, default=10, help="Number of newest tags to preserve")
+    parser.add_argument("--skip-repos", nargs="+", default=["logspout"],
+                        help="List of repository name prefixes to skip (default: logspout)")
     return parser.parse_args()
 
 def get_paginated_results(url, headers, params=None):
@@ -121,9 +123,9 @@ def main():
         
         for repo_data in repos:
             repo_name = repo_data["name"]
-            # Skip repositories that start with 'logspout'
-            if repo_name.startswith("logspout"):
-                print(f"Skipping logspout repository: {repo_name}")
+            # Check if repository name starts with any of the prefixes provided in skip_repos
+            if any(repo_name.startswith(prefix) for prefix in args.skip_repos):
+                print(f"Skipping repository: {repo_name}")
                 continue
             
             # Fetch tags for the repository
