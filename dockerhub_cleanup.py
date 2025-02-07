@@ -34,6 +34,7 @@ def parse_args():
     parser.add_argument("--preserve", nargs="+", default=[],
                         help="List of preservation rules in format prefix:number (e.g., prod:10 staging:5)")
     parser.add_argument("--input-json", help="Path to JSON file with repository/tag data to use instead of pulling from the API")
+    parser.add_argument("--repos", nargs="+", help="List of specific repositories to process (ignores skip-repos)")
     return parser.parse_args()
 
 def get_paginated_results(url, headers, params=None):
@@ -157,9 +158,14 @@ def fetch_backup_data(args, headers):
     
     for repo_data in repos:
         repo_name = repo_data["name"]
-        if any(repo_name.startswith(prefix) for prefix in args.skip_repos):
-            print(f"Skipping repository: {repo_name}")
-            continue
+        # If --repos is provided, process only specified repos; otherwise, use skip-repos filtering.
+        if args.repos:
+            if repo_name not in args.repos:
+                continue
+        else:
+            if any(repo_name.startswith(prefix) for prefix in args.skip_repos):
+                print(f"Skipping repository: {repo_name}")
+                continue
         tags_url = f"{DH_API_BASE}/repositories/{args.namespace}/{repo_name}/tags/"
         try:
             tags = get_paginated_results(tags_url, headers)
@@ -203,9 +209,16 @@ def main():
         
         backup_data = get_backup_data(args, headers)
         
-        # Process each repository's backup data
+        # Filter backup_data if specific repositories are provided via --repos
+        if args.repos:
+            backup_data = {repo: tags for repo, tags in backup_data.items() if repo in args.repos}
+            if not backup_data:
+                print("No matching repositories found in backup data for the provided --repos argument.")
+                return
+        
+        # Process each repository's backup data; use skip-repos only when --repos is not provided.
         for repo_name, tags in backup_data.items():
-            if any(repo_name.startswith(prefix) for prefix in args.skip_repos):
+            if not args.repos and any(repo_name.startswith(prefix) for prefix in args.skip_repos):
                 print(f"Skipping repository: {repo_name}")
                 continue
             process_repository(repo_name, tags, args, preserve_rules, headers, writer)
