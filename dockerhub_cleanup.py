@@ -1,4 +1,5 @@
 import argparse
+from ast import parse
 import csv
 import json
 from datetime import datetime, timedelta
@@ -26,6 +27,8 @@ def parse_args():
     parser.add_argument("--token", required=True, help="Docker Hub PAT with read:write scope")
     parser.add_argument("--dry-run", action="store_true", help="Preview changes without deleting")
     parser.add_argument("--backup-file", default="dockerhub_backup.json", help="Backup file path")
+    parser.add_argument("--retention-days", type=int, default=90, help="Days to retain tags")
+    parser.add_argument("--preserve-last", type=int, default=10, help="Number of newest tags to preserve")
     return parser.parse_args()
 
 def get_paginated_results(url, headers, params=None):
@@ -45,7 +48,7 @@ def main():
     
     # Backup storage
     backup_data = {}
-    pull_cutoff = datetime.utcnow() - timedelta(days=90)
+    pull_cutoff = datetime.utcnow() - timedelta(days=args.retention_days)
     
     # CSV logging setup 
     with open("cleanup_report.csv", "w", newline="") as csvfile:
@@ -89,10 +92,10 @@ def main():
                 if tag["name"].lower() in {"latest", "prod", "production"}
             )
             
-            # Preserve top 10 newest tags regardless of pull status
-            preserved_tags.update(tag["name"] for tag in sorted_tags[:10])
+            # Preserve top X newest tags regardless of pull status
+            preserved_tags.update(tag["name"] for tag in sorted_tags[:args.preserve_last])
             
-            # Preserve tags pulled within 90 days
+            # Preserve tags pulled within X days
             preserved_tags.update(
                 tag["name"] for tag in sorted_tags
                 if tag.get("last_pulled") 
@@ -111,7 +114,7 @@ def main():
                         last_pulled,
                         tag["last_updated"],
                         "PRESERVED",
-                        _get_preservation_reason(tag, preserved_tags)
+                        _get_preservation_reason(tag, preserved_tags, args)
                     ])
                     continue
                 
@@ -122,7 +125,7 @@ def main():
                 else:
                     last_pulled_dt = parse_docker_date(last_pulled)
                     if last_pulled_dt < pull_cutoff:
-                        delete_reason.append("not pulled in 90 days")
+                        delete_reason.append(f"not pulled since {pull_cutoff}")
                 
                 if delete_reason:
                     deletion_candidates.append(tag)
@@ -141,7 +144,7 @@ def main():
                         last_pulled,
                         tag["last_updated"],
                         "PRESERVED",
-                        "pulled within 90 days"
+                        f"pulled within {args.retention_days} days"
                     ])
 
             # Delete candidates
@@ -164,14 +167,14 @@ def main():
         json.dump(backup_data, f, indent=2)
     print(f"Backup saved to {args.backup_file}")
 
-def _get_preservation_reason(tag, preserved_tags):
+def _get_preservation_reason(tag, preserved_tags, args):
     """Helper to determine preservation reason for logging"""
     if tag["name"].lower() in {"latest", "prod", "production"}:
-        return "critical tag"
+        return "critical tags"
     if tag["name"] in list(preserved_tags)[:10]:
-        return "top 10 recent tag"
+        return f"top {args.preserve_last} newest tags"
     if tag.get("last_pulled"):
-        return "pulled within 90 days"
+        return f"pulled within {args.retention_days} days"
     return "unknown preservation reason"
 
 if __name__ == "__main__":
