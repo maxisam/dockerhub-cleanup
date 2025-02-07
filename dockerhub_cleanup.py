@@ -25,15 +25,15 @@ def parse_args():
     parser.add_argument("--namespace", required=True, help="Docker Hub namespace/organization")
     parser.add_argument("--token", required=True, help="Docker Hub PAT with read:write scope")
     parser.add_argument("--dry-run", action="store_true", help="Preview changes without deleting")
-    parser.add_argument("--backup-file", default="dockerhub_backup.json", help="Backup file path")
+    parser.add_argument("--backup-file", default="dockerhub_backup.json", help="Backup file path (used when not providing --input-json)")
     parser.add_argument("--retention-days", type=int, default=90, help="Days to retain tags")
     parser.add_argument("--preserve-last", type=int, default=10,
                         help="Global number of newest tags to preserve if no --preserve rules are provided")
     parser.add_argument("--skip-repos", nargs="+", default=["logspout"],
                         help="List of repository name prefixes to skip (default: logspout)")
-    # New argument: preservation rules in format prefix:number
     parser.add_argument("--preserve", nargs="+", default=[],
                         help="List of preservation rules in format prefix:number (e.g., prod:10 staging:5)")
+    parser.add_argument("--input-json", help="Path to JSON file with repository/tag data to use instead of pulling from the API")
     return parser.parse_args()
 
 def get_paginated_results(url, headers, params=None):
@@ -63,7 +63,7 @@ def process_tags(tags, retention_days, global_preserve_last, preserve_rules):
         last_updated_str = tag.get("last_updated")
         last_updated_dt = parse_docker_date(last_updated_str)
         last_pulled_str = tag.get("last_pulled")
-        last_pulled_dt = parse_docker_date(last_pulled_str) if last_pulled_str else None
+        last_pulled_dt = parse_docker_date(last_pulled_str) if last_pulled_str and last_pulled_str != "0001-01-01T00:00:00Z" else None
         
         processed.append({
             "name": tag_name,
@@ -122,6 +122,64 @@ def process_tags(tags, retention_days, global_preserve_last, preserve_rules):
     
     return processed
 
+def process_repository(repo_name, tags, args, preserve_rules, headers, writer):
+    processed_tags = process_tags(tags, args.retention_days, args.preserve_last, preserve_rules)
+    for tag in processed_tags:
+        writer.writerow([
+            repo_name,
+            tag["name"],
+            tag["last_pulled_str"],
+            tag["last_updated_str"],
+            tag["status"],
+            tag["reason"]
+        ])
+        if tag["status"] == "TO DELETE":
+            if args.dry_run:
+                print(f"[Dry Run] Would delete {repo_name}:{tag['name']}")
+            else:
+                delete_url = f"{DH_API_BASE}/repositories/{args.namespace}/{repo_name}/tags/{tag['name']}/"
+                try:
+                    response = requests.delete(delete_url, headers=headers)
+                    response.raise_for_status()
+                    print(f"Deleted {repo_name}:{tag['name']}")
+                    time.sleep(1)
+                except requests.HTTPError as e:
+                    print(f"Failed to delete {repo_name}:{tag['name']} - {str(e)}")
+
+def fetch_backup_data(args, headers):
+    backup_data = {}
+    try:
+        repos_url = f"{DH_API_BASE}/repositories/{args.namespace}/"
+        repos = get_paginated_results(repos_url, headers)
+    except requests.HTTPError:
+        repos_url = f"{DH_API_BASE}/users/{args.namespace}/repositories/"
+        repos = get_paginated_results(repos_url, headers)
+    
+    for repo_data in repos:
+        repo_name = repo_data["name"]
+        if any(repo_name.startswith(prefix) for prefix in args.skip_repos):
+            print(f"Skipping repository: {repo_name}")
+            continue
+        tags_url = f"{DH_API_BASE}/repositories/{args.namespace}/{repo_name}/tags/"
+        try:
+            tags = get_paginated_results(tags_url, headers)
+        except requests.HTTPError as e:
+            print(f"Error fetching tags for {repo_name}: {str(e)}")
+            continue
+        backup_data[repo_name] = tags
+    return backup_data
+
+def load_backup_data(args):
+    with open(args.input_json, "r") as f:
+        return json.load(f)
+
+def get_backup_data(args, headers):
+    if args.input_json:
+        print(f"Loading backup data from {args.input_json} ...")
+        return load_backup_data(args)
+    else:
+        return fetch_backup_data(args, headers)
+
 def main():
     args = parse_args()
     
@@ -139,70 +197,24 @@ def main():
     
     headers = {"Authorization": f"Bearer {args.token}"}
     
-    # For backup purposes
-    backup_data = {}
-    
-    # CSV logging setup
     with open("cleanup_report.csv", "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["Repository", "Tag", "Last Pulled", "Last Updated", "Status", "Reason"])
         
-        # Get all repositories
-        try:
-            repos_url = f"{DH_API_BASE}/repositories/{args.namespace}/"
-            repos = get_paginated_results(repos_url, headers)
-        except requests.HTTPError:
-            repos_url = f"{DH_API_BASE}/users/{args.namespace}/repositories/"
-            repos = get_paginated_results(repos_url, headers)
+        backup_data = get_backup_data(args, headers)
         
-        for repo_data in repos:
-            repo_name = repo_data["name"]
-            # Check if repository name starts with any of the prefixes provided in skip_repos
+        # Process each repository's backup data
+        for repo_name, tags in backup_data.items():
             if any(repo_name.startswith(prefix) for prefix in args.skip_repos):
                 print(f"Skipping repository: {repo_name}")
                 continue
-            
-            # Fetch tags for the repository
-            tags_url = f"{DH_API_BASE}/repositories/{args.namespace}/{repo_name}/tags/"
-            try:
-                tags = get_paginated_results(tags_url, headers)
-            except requests.HTTPError as e:
-                print(f"Error fetching tags for {repo_name}: {str(e)}")
-                continue
-            
-            backup_data[repo_name] = tags
-            
-            # Process tags to add computed fields
-            processed_tags = process_tags(tags, args.retention_days, args.preserve_last)
-            
-            for tag in processed_tags:
-                writer.writerow([
-                    repo_name,
-                    tag["name"],
-                    tag["last_pulled_str"],
-                    tag["last_updated_str"],
-                    tag["status"],
-                    tag["reason"]
-                ])
-                
-                # Delete candidates if not preserved and not in dry-run mode.
-                if tag["status"] == "TO DELETE":
-                    if args.dry_run:
-                        print(f"[Dry Run] Would delete {repo_name}:{tag['name']}")
-                    else:
-                        delete_url = f"{DH_API_BASE}/repositories/{args.namespace}/{repo_name}/tags/{tag['name']}/"
-                        try:
-                            response = requests.delete(delete_url, headers=headers)
-                            response.raise_for_status()
-                            print(f"Deleted {repo_name}:{tag['name']}")
-                            time.sleep(1)  # Rate limit protection
-                        except requests.HTTPError as e:
-                            print(f"Failed to delete {repo_name}:{tag['name']} - {str(e)}")
-    
-    # Save backup data to file
-    with open(args.backup_file, "w") as f:
-        json.dump(backup_data, f, indent=2)
-    print(f"Backup saved to {args.backup_file}")
+            process_repository(repo_name, tags, args, preserve_rules, headers, writer)
+        
+        # Save backup data if it was fetched from the API.
+        if not args.input_json:
+            with open(args.backup_file, "w") as f:
+                json.dump(backup_data, f, indent=2)
+            print(f"Backup saved to {args.backup_file}")
 
 if __name__ == "__main__":
     main()
