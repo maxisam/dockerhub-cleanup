@@ -27,9 +27,13 @@ def parse_args():
     parser.add_argument("--dry-run", action="store_true", help="Preview changes without deleting")
     parser.add_argument("--backup-file", default="dockerhub_backup.json", help="Backup file path")
     parser.add_argument("--retention-days", type=int, default=90, help="Days to retain tags")
-    parser.add_argument("--preserve-last", type=int, default=10, help="Number of newest tags to preserve")
+    parser.add_argument("--preserve-last", type=int, default=10,
+                        help="Global number of newest tags to preserve if no --preserve rules are provided")
     parser.add_argument("--skip-repos", nargs="+", default=["logspout"],
                         help="List of repository name prefixes to skip (default: logspout)")
+    # New argument: preservation rules in format prefix:number
+    parser.add_argument("--preserve", nargs="+", default=[],
+                        help="List of preservation rules in format prefix:number (e.g., prod:10 staging:5)")
     return parser.parse_args()
 
 def get_paginated_results(url, headers, params=None):
@@ -43,9 +47,11 @@ def get_paginated_results(url, headers, params=None):
         time.sleep(1)  # Rate limit protection
     return results
 
-def process_tags(tags, retention_days, preserve_last):
+def process_tags(tags, retention_days, global_preserve_last, preserve_rules):
     """
     Process the tags list to compute parsed dates and determine preservation criteria.
+    'preserve_rules' is a dict mapping a tag prefix to the number of tags to preserve for that prefix.
+    If preserve_rules is empty, the global_preserve_last value is used.
     Returns a list of tag dictionaries with additional computed fields.
     """
     pull_cutoff = datetime.utcnow() - timedelta(days=retention_days)
@@ -71,20 +77,35 @@ def process_tags(tags, retention_days, preserve_last):
     # Sort tags by last_updated_dt (newest first)
     processed.sort(key=lambda x: x["last_updated_dt"], reverse=True)
     
-    # Determine preservation flags:
-    # Critical names are always preserved.
-    critical_names = {"latest", "prod", "production"}
-    # Also preserve the top `preserve_last` newest tags.
-    top_newest = {tag["name"] for tag in processed[:preserve_last]}
+    # Prepare a dictionary to track preserved tags and their preservation reasons.
+    preserved_reasons = {}
     
+    # Always preserve tags with critical names.
+    critical_names = {"latest", "prod", "production"}
+    for tag in processed:
+        if tag["name"].lower() in critical_names:
+            preserved_reasons[tag["name"]] = "critical tag"
+    
+    # Apply per-prefix preservation rules if provided.
+    if preserve_rules:
+        for prefix, count in preserve_rules.items():
+            matching = [tag for tag in processed if tag["name"].startswith(prefix)]
+            for tag in matching[:count]:
+                if tag["name"] not in preserved_reasons:
+                    preserved_reasons[tag["name"]] = f"top {count} for prefix '{prefix}'"
+    else:
+        # Fallback: preserve the global top newest tags.
+        for tag in processed[:global_preserve_last]:
+            if tag["name"] not in preserved_reasons:
+                preserved_reasons[tag["name"]] = f"top {global_preserve_last} newest tags"
+    
+    # Determine the final status for each tag.
     for tag in processed:
         reasons = []
-        if tag["name"].lower() in critical_names:
-            reasons.append("critical tag")
-        if tag["name"] in top_newest:
-            reasons.append(f"top {preserve_last} newest tags")
+        if tag["name"] in preserved_reasons:
+            reasons.append(preserved_reasons[tag["name"]])
         if tag["last_pulled_dt"] and tag["last_pulled_dt"] >= pull_cutoff:
-            reasons.append(f"pulled within retention period ({retention_days} days)")
+            reasons.append(f"pulled within retention ({retention_days} days)")
         
         if reasons:
             tag["status"] = "PRESERVED"
@@ -103,6 +124,19 @@ def process_tags(tags, retention_days, preserve_last):
 
 def main():
     args = parse_args()
+    
+    # Parse the preservation rules into a dictionary.
+    # Expected format: prefix:number (e.g., prod:10 staging:5)
+    preserve_rules = {}
+    for rule in args.preserve:
+        try:
+            prefix, count = rule.split(":", 1)
+            preserve_rules[prefix] = int(count)
+        except Exception:
+            raise argparse.ArgumentTypeError(
+                f"Invalid preserve rule '{rule}'. Expected format prefix:number"
+            )
+    
     headers = {"Authorization": f"Bearer {args.token}"}
     
     # For backup purposes
