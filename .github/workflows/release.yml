@@ -27,4 +27,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}/dockerhub-cleanup-action:${{ github.ref_name }}
+          tags: |
+            ghcr.io/${{ github.repository }}/dockerhub-cleanup-action:${{ github.ref_name }}
+            ghcr.io/${{ github.repository }}/dockerhub-cleanup-action:latest
