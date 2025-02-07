@@ -23,7 +23,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Run DockerHub Cleanup Action
-        uses: ./  # references the DockerHub Cleanup Action in the repository
+        # uses: ./  # references the DockerHub Cleanup Action in the repository
+        uses: maxisam/dockerhub-cleanup@main
         with:
           namespace: ${{ secrets.DOCKER_USERNAME }}
           token: ${{ secrets.DOCKER_PASSWORD }}
