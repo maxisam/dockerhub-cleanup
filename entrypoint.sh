@@ -20,5 +20,5 @@ if [ "${INPUT_DRY_RUN}" = "true" ]; then
   ARGS="$ARGS --dry-run"
 fi
 
-echo "Running: python dockerhub_cleanup.py $ARGS"
-exec python dockerhub_cleanup.py $ARGS
+echo "Running: python /action/dockerhub_cleanup.py $ARGS"
+exec python /action/dockerhub_cleanup.py $ARGS
