@@ -2,9 +2,8 @@ name: 'DockerHub Cleanup Action'
 description: 'A GitHub Action that cleans up Docker Hub tags using a Python script.'
 author: 'Sam Lin'
 branding:
-  icon: 'package'
-  color: 'blue'
-
+  icon: trash-2
+  color: blue
 inputs:
   namespace:
     description: 'Docker Hub namespace/organization'
@@ -47,4 +46,4 @@ inputs:
 
 runs:
   using: 'docker'
-  image: 'ghcr.io/maxisam/dockerhub-cleanup-action:latest'
+  image: 'Dockerfile'
