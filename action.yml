@@ -11,23 +11,23 @@ inputs:
   token:
     description: 'Docker Hub Personal Access Token'
     required: true
-  dry-run:
+  dry_run:
     description: 'Run in dry-run mode (set to true to simulate deletion)'
     required: false
     default: 'false'
-  backup-file:
+  backup_file:
     description: 'Backup file path'
     required: false
     default: 'dockerhub_backup.json'
-  retention-days:
+  retention_days:
     description: 'Days to retain tags'
     required: false
     default: '30'
-  preserve-last:
+  preserve_last:
     description: 'Global number of newest tags to preserve if no preservation rules provided'
     required: false
     default: '10'
-  skip-repos:
+  skip_repos:
     description: 'space-separated list of repository name prefixes to skip'
     required: false
     default: 'logspout'
@@ -35,7 +35,7 @@ inputs:
     description: 'space-separated list of preservation rules in the format prefix:number (e.g., prod:10 staging:5)'
     required: false
     default: ''
-  input-json:
+  input_json:
     description: 'Path to a JSON file with repository/tag data (if not pulling from the API)'
     required: false
     default: ''
@@ -43,7 +43,7 @@ inputs:
     description: 'space-separated list of specific repositories to process'
     required: false
     default: ''
-  report-file:
+  report_file:
     description: 'Report file path'
     required: false
     default: 'cleanup_report.csv'
