@@ -33,3 +33,15 @@ jobs:
           preserve: ${{ github.event.inputs.preserve }}
           input-json: ''
           repos: ${{ github.event.inputs.repos }}
+          
+      - name: Upload Generated Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleanup_report
+          path: cleanup_report.csv
+
+      - name: Upload backup file
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup_file
+          path: dockerhub_backup.json
