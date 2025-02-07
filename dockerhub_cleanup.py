@@ -62,7 +62,7 @@ def process_tags(tags, retention_days, global_preserve_last, preserve_rules):
         tag_name = tag.get("name")
         last_updated_str = tag.get("last_updated")
         last_updated_dt = parse_docker_date(last_updated_str)
-        last_pulled_str = tag.get("last_pulled")
+        last_pulled_str = tag.get("tag_last_pulled")
         last_pulled_dt = parse_docker_date(last_pulled_str) if last_pulled_str and last_pulled_str != "0001-01-01T00:00:00Z" else None
         
         processed.append({
