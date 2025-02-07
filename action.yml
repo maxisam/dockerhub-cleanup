@@ -43,6 +43,10 @@ inputs:
     description: 'space-separated list of specific repositories to process'
     required: false
     default: ''
+  report-file:
+    description: 'Report file path'
+    required: false
+    default: 'cleanup_report.csv'
 
 runs:
   using: 'docker'
