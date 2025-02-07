@@ -47,4 +47,4 @@ inputs:
 
 runs:
   using: 'docker'
-  image: 'ghcr.io/maxisam/dockerhub-cleanup-action:latest'
+  image: 'ghcr.io/maxisam/dockerhub-cleanup-action:v0.1.0'
