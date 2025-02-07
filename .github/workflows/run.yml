@@ -28,11 +28,11 @@ jobs:
         with:
           namespace: ${{ secrets.DOCKER_USERNAME }}
           token: ${{ secrets.DOCKER_PASSWORD }}
-          dry-run: ${{ github.event.inputs.dry-run }}
-          retention-days: '30'
-          preserve-last: '10'
+          dry_run: ${{ github.event.inputs.dry-run }}
+          retention_days: '30'
+          preserve_last: '10'
           preserve: ${{ github.event.inputs.preserve }}
-          input-json: ''
+          input_json: ''
           repos: ${{ github.event.inputs.repos }}
           
       - name: Upload Generated Report
