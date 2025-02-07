@@ -1,0 +1,35 @@
+name: Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Run in dry-run mode (true/false)'
+        required: false
+        default: 'true'
+      repos:
+        description: 'Specific repositories to process'
+        required: false
+        default: ''
+      preserve:
+        description: 'Preservation rules input'
+        required: false
+        default: ''
+
+jobs:
+  run-action:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run DockerHub Cleanup Action
+        uses: ./  # references the DockerHub Cleanup Action in the repository
+        with:
+          namespace: ${{ secrets.DOCKERHUB_USERNAME }}
+          token: ${{ secrets.DOCKERHUB_PASSWORD }}
+          dry-run: ${{ github.event.inputs.dry-run }}
+          retention-days: '30'
+          preserve-last: '10'
+          preserve: ${{ github.event.inputs.preserve }}
+          input-json: ''
+          repos: ${{ github.event.inputs.repos }}
