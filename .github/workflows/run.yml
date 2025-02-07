@@ -25,8 +25,8 @@ jobs:
       - name: Run DockerHub Cleanup Action
         uses: ./  # references the DockerHub Cleanup Action in the repository
         with:
-          namespace: ${{ secrets.DOCKERHUB_USERNAME }}
-          token: ${{ secrets.DOCKERHUB_PASSWORD }}
+          namespace: ${{ secrets.DOCKER_USERNAME }}
+          token: ${{ secrets.DOCKER_PASSWORD }}
           dry-run: ${{ github.event.inputs.dry-run }}
           retention-days: '30'
           preserve-last: '10'
