@@ -1,0 +1,50 @@
+name: 'DockerHub Cleanup Action'
+description: 'A GitHub Action that cleans up Docker Hub tags using a Python script.'
+author: 'Sam Lin'
+branding:
+  icon: 'package'
+  color: 'blue'
+
+inputs:
+  namespace:
+    description: 'Docker Hub namespace/organization'
+    required: true
+  token:
+    description: 'Docker Hub Personal Access Token'
+    required: true
+  dry-run:
+    description: 'Run in dry-run mode (set to true to simulate deletion)'
+    required: false
+    default: 'false'
+  backup-file:
+    description: 'Backup file path'
+    required: false
+    default: 'dockerhub_backup.json'
+  retention-days:
+    description: 'Days to retain tags'
+    required: false
+    default: '30'
+  preserve-last:
+    description: 'Global number of newest tags to preserve if no preservation rules provided'
+    required: false
+    default: '10'
+  skip-repos:
+    description: 'space-separated list of repository name prefixes to skip'
+    required: false
+    default: 'logspout'
+  preserve:
+    description: 'space-separated list of preservation rules in the format prefix:number (e.g., prod:10 staging:5)'
+    required: false
+    default: ''
+  input-json:
+    description: 'Path to a JSON file with repository/tag data (if not pulling from the API)'
+    required: false
+    default: ''
+  repos:
+    description: 'space-separated list of specific repositories to process'
+    required: false
+    default: ''
+
+runs:
+  using: 'docker'
+  image: 'ghcr.io/maxisam/dockerhub-cleanup-action:latest'
