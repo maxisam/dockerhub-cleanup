@@ -81,26 +81,21 @@ def process_tags(tags, retention_days, global_preserve_last, preserve_rules):
     # Prepare a dictionary to track preserved tags and their preservation reasons.
     preserved_reasons = {}
     
-    # Always preserve tags with critical names.
-    critical_names = {"latest", "prod", "production"}
-    for tag in processed:
-        if tag["name"].lower() in critical_names:
-            preserved_reasons[tag["name"]] = "critical tag"
-    
-    # Apply per-prefix preservation rules if provided.
     if preserve_rules:
         for prefix, count in preserve_rules.items():
             matching = [tag for tag in processed if tag["name"].startswith(prefix)]
-            for tag in matching[:count]:
-                if tag["name"] not in preserved_reasons:
-                    preserved_reasons[tag["name"]] = f"top {count} for prefix '{prefix}'"
+            if count is None:
+                for tag in matching:
+                    preserved_reasons[tag["name"]] = f"preserved all for prefix '{prefix}'"
+            else:
+                for tag in matching[:count]:
+                    if tag["name"] not in preserved_reasons:
+                        preserved_reasons[tag["name"]] = f"top {count} for prefix '{prefix}'"
     else:
-        # Fallback: preserve the global top newest tags.
         for tag in processed[:global_preserve_last]:
             if tag["name"] not in preserved_reasons:
                 preserved_reasons[tag["name"]] = f"top {global_preserve_last} newest tags"
     
-    # Determine the final status for each tag.
     for tag in processed:
         reasons = []
         if tag["name"] in preserved_reasons:
@@ -112,7 +107,6 @@ def process_tags(tags, retention_days, global_preserve_last, preserve_rules):
             tag["status"] = "PRESERVED"
             tag["reason"] = ", ".join(reasons)
         else:
-            # Determine deletion reason based on pull history.
             deletion_reasons = []
             if not tag["last_pulled_dt"]:
                 deletion_reasons.append("never pulled")
@@ -193,14 +187,12 @@ def main():
     # Expected format: prefix:number (e.g., prod:10 staging:5)
     preserve_rules = {}
     for rule in args.preserve:
-        try:
+        if ":" in rule:
             prefix, count = rule.split(":", 1)
             preserve_rules[prefix] = int(count)
-        except Exception:
-            raise argparse.ArgumentTypeError(
-                f"Invalid preserve rule '{rule}'. Expected format prefix:number"
-            )
-    
+        else:
+            preserve_rules[rule] = None
+
     headers = {"Authorization": f"Bearer {args.token}"}
     
     with open("cleanup_report.csv", "w", newline="") as csvfile:
