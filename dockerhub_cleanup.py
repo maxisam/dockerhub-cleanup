@@ -35,6 +35,7 @@ def parse_args():
                         help="List of preservation rules in format prefix:number (e.g., prod:10 staging:5)")
     parser.add_argument("--input-json", help="Path to JSON file with repository/tag data to use instead of pulling from the API")
     parser.add_argument("--repos", nargs="+", help="List of specific repositories to process (ignores skip-repos)")
+    parser.add_argument("--report-file", default="cleanup_report.csv", help="Report file path")  # new argument
     return parser.parse_args()
 
 def get_paginated_results(url, headers, params=None):
@@ -195,7 +196,7 @@ def main():
 
     headers = {"Authorization": f"Bearer {args.token}"}
     
-    with open("cleanup_report.csv", "w", newline="") as csvfile:
+    with open(args.report_file, "w", newline="") as csvfile:  # use report file from argument
         writer = csv.writer(csvfile)
         writer.writerow(["Repository", "Tag", "Last Pulled", "Last Updated", "Status", "Reason"])
         

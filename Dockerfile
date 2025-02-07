@@ -1,8 +1,8 @@
 # Use an official slim Python image
 FROM python:3.9-slim
 
-# Set the working directory to the mounted workspace
-WORKDIR /github/workspace
+# Set the working directory inside the container
+WORKDIR /action
 
 # Copy the requirements file and install dependencies
 COPY requirements.txt ./
@@ -15,4 +15,5 @@ COPY entrypoint.sh .
 # Ensure the entrypoint script is executable
 RUN chmod +x entrypoint.sh
 
-ENTRYPOINT ["/github/workspace/entrypoint.sh"]
+# Set the entrypoint to the shell script
+ENTRYPOINT ["/action/entrypoint.sh"]
