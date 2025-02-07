@@ -1,5 +1,9 @@
 # DockerHub Cleanup Script
 
+## Acknowledgements
+
+This project is inspired by the work of https://github.com/bekvbe/dockerhub-cleanup and has been adapted to include additional features and improvements.
+
 ## Overview
 The **DockerHub Cleanup Script** is a Python-based tool designed to manage and optimize DockerHub storage usage. With DockerHub enforcing a storage limit, this script automates the cleanup of old and unused Docker image tags to ensure compliance while retaining critical assets.
 
